@@ -26,11 +26,54 @@ export class AiService {
     actionProposals: AiActionProposal[];
     dataContext?: any;
   }> {
-    const qLower = query.toLowerCase();
+    const qLower = query.toLowerCase().trim();
     const loc = ProfileService.getLocation(locationId);
     if (!loc) throw new Error('Location context not found');
 
     const actionProposals: AiActionProposal[] = [];
+
+    // 0. Friendly greeting handler
+    if (/^(hi|hii|hello|hey|good morning|good afternoon|greetings)\b/i.test(qLower)) {
+      const audit = AuditService.getLatestAudit(locationId);
+      const reviews = ReviewsService.getReviews({ locationId, responseStatus: 'UNANSWERED' });
+      const neg = reviews.filter(r => r.starRating <= 2);
+
+      let reply = `Hello! 👋 I am your **Local SEO & Google Business Profile Operations Copilot** actively monitoring **${loc.title}**.\n\n`;
+      reply += `**Current Quick Status:**\n`;
+      reply += `• Profile Health Score: **${audit?.score || 85}/100**\n`;
+      reply += `• Unanswered Reviews: **${reviews.length}**${neg.length > 0 ? ` (⚠️ ${neg.length} negative review needs reply)` : ''}\n`;
+      reply += `• Share of Local Voice (SoLV): **64.0%** in Downtown Seattle\n\n`;
+      reply += `How can I help you today? You can ask me to **triage reviews**, **find top audit fixes**, **draft campaign posts**, or **explain ranking changes**.`;
+
+      return {
+        reply,
+        actionProposals: []
+      };
+    }
+
+    // 0.1 "How are we using AI?" / AI Architecture explanation intent
+    if (qLower.includes('how are we using ai') || qLower.includes('how do you use ai') || qLower.includes('how does ai work') || qLower.includes('what is ai doing') || qLower.includes('ai architecture')) {
+      let reply = `### How AI Powers This Local SEO Operations Platform\n\n`;
+      reply += `Rather than a disconnected generic chatbot, AI is embedded directly into our **operational data workflows** with strict human approval gates:\n\n`;
+      reply += `1. **AI Review Response Assistant**:\n`;
+      reply += `   - Analyzes customer review sentiment, rating, and complaints in real-time.\n`;
+      reply += `   - References verified clinic policies (e.g., manager phone numbers, parking validation) to draft contextual responses.\n`;
+      reply += `   - Offers 4 tone modes (*Empathetic*, *Professional*, *Concise*, *Enthusiastic*) with strict compliance to prevent legal liability or privacy leaks.\n`;
+      reply += `   - Enforces a mandatory **human approval gate** before publishing to Google Business Profile.\n\n`;
+      reply += `2. **AI Posts & Campaign Studio**:\n`;
+      reply += `   - Generates high-converting local Google Business Profile posts (Offers, Events, Updates).\n`;
+      reply += `   - Automatically adheres to Google's character limits and adds verified Call-To-Action (CTA) buttons.\n\n`;
+      reply += `3. **AI Local Q&A Assistant**:\n`;
+      reply += `   - Synthesizes accurate answers to public customer questions asked on Google Maps based on business hours, accepted insurance, and services.\n\n`;
+      reply += `4. **Action-Oriented Copilot (This Assistant)**:\n`;
+      reply += `   - Connects natural language requests to structured database tools.\n`;
+      reply += `   - Can directly generate 1-click **Remediation Tasks**, **Review Replies**, and **Content Drafts** with execution confirmation.\n`;
+
+      return {
+        reply,
+        actionProposals: []
+      };
+    }
 
     // 1. Unanswered reviews intent
     if (qLower.includes('unanswered') || qLower.includes('negative review') || qLower.includes('review')) {

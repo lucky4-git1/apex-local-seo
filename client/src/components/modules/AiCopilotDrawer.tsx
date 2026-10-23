@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../api/client';
 import { Sparkles, X, Send, CheckCircle2, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
@@ -28,6 +28,17 @@ export const AiCopilotDrawer: React.FC = () => {
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [executingProposal, setExecutingProposal] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    if (isAiDrawerOpen) {
+      scrollToBottom();
+    }
+  }, [messages, isAiDrawerOpen]);
 
   if (!isAiDrawerOpen) return null;
 
@@ -87,9 +98,9 @@ export const AiCopilotDrawer: React.FC = () => {
   return (
     <>
       <div className="side-drawer-backdrop" onClick={() => setIsAiDrawerOpen(false)} />
-      <div className="side-drawer" style={{ width: '540px' }}>
+      <div className="side-drawer" style={{ width: '560px', height: '100vh', maxHeight: '100vh', overflow: 'hidden' }}>
         {/* Header */}
-        <div className="p-3 border-bottom d-flex align-items-center justify-content-between bg-light">
+        <div className="p-3 border-bottom d-flex align-items-center justify-content-between bg-light flex-shrink-0">
           <div className="d-flex align-items-center gap-2">
             <div className="rounded p-1 bg-primary text-white d-flex align-items-center justify-content-center">
               <Sparkles size={18} />
@@ -109,17 +120,26 @@ export const AiCopilotDrawer: React.FC = () => {
           </button>
         </div>
 
-        {/* Message feed */}
-        <div className="flex-1 overflow-y-auto p-3 d-flex flex-direction-column gap-3">
+        {/* Message feed - strictly vertical column */}
+        <div
+          className="d-flex flex-column gap-3 p-3 flex-grow-1"
+          style={{ overflowY: 'auto', overflowX: 'hidden' }}
+        >
           {messages.map((m, idx) => (
             <div
               key={idx}
-              className={`p-3 rounded ${
+              className={`p-3 rounded shadow-sm ${
                 m.role === 'user'
-                  ? 'bg-primary text-white ms-4 align-self-end shadow-sm'
-                  : 'bg-white border text-dark me-3 shadow-sm'
+                  ? 'bg-primary text-white align-self-end ms-auto'
+                  : 'bg-white border text-dark align-self-start w-100'
               }`}
-              style={{ fontSize: '0.875rem', lineHeight: '1.5' }}
+              style={{
+                maxWidth: m.role === 'user' ? '80%' : '100%',
+                fontSize: '0.875rem',
+                lineHeight: '1.5',
+                wordBreak: 'break-word',
+                overflowWrap: 'anywhere'
+              }}
             >
               <div
                 style={{ whiteSpace: 'pre-line' }}
@@ -171,15 +191,16 @@ export const AiCopilotDrawer: React.FC = () => {
           ))}
 
           {loading && (
-            <div className="p-3 rounded bg-white border text-secondary small d-flex align-items-center gap-2 me-3">
+            <div className="p-3 rounded bg-white border text-secondary small d-flex align-items-center gap-2 w-100">
               <span className="spinner-border spinner-border-sm text-primary" role="status" />
               <span>Analyzing profile data and synthesizing actionable plan...</span>
             </div>
           )}
+          <div ref={messagesEndRef} />
         </div>
 
         {/* Quick prompts */}
-        <div className="p-2 px-3 border-top bg-light">
+        <div className="p-2 px-3 border-top bg-light flex-shrink-0">
           <div className="text-muted small mb-1" style={{ fontSize: '0.7rem' }}>
             Quick Actions:
           </div>
@@ -216,7 +237,7 @@ export const AiCopilotDrawer: React.FC = () => {
         </div>
 
         {/* Input */}
-        <div className="p-3 border-top bg-white">
+        <div className="p-3 border-top bg-white flex-shrink-0">
           <form
             onSubmit={(e) => {
               e.preventDefault();
