@@ -20,6 +20,8 @@ import {
 export const ReviewsModule: React.FC = () => {
   const { currentLocation, showToast } = useApp();
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [themes, setThemes] = useState<{ positiveThemes: any[]; frictionPoints: any[] }>({ positiveThemes: [], frictionPoints: [] });
+  const [activeTopic, setActiveTopic] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Filters
@@ -37,8 +39,19 @@ export const ReviewsModule: React.FC = () => {
   useEffect(() => {
     if (currentLocation) {
       loadReviews();
+      loadThemes();
     }
-  }, [currentLocation?.id, ratingFilter, statusFilter]);
+  }, [currentLocation?.id, ratingFilter, statusFilter, activeTopic]);
+
+  const loadThemes = async () => {
+    if (!currentLocation) return;
+    try {
+      const res = await api.getReviewThemes(currentLocation.id);
+      setThemes(res);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const loadReviews = async () => {
     if (!currentLocation) return;
@@ -46,7 +59,7 @@ export const ReviewsModule: React.FC = () => {
       const res = await api.getReviews(currentLocation.id, {
         rating: ratingFilter !== 'all' ? Number(ratingFilter) : undefined,
         responseStatus: statusFilter !== 'all' ? statusFilter : undefined,
-        search: searchQuery || undefined
+        search: activeTopic || searchQuery || undefined
       });
       setReviews(res);
       if (res.length > 0 && !selectedReview) {
@@ -152,6 +165,60 @@ export const ReviewsModule: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Customer Sentiment & Topic Clusters Bar */}
+      {(themes.positiveThemes.length > 0 || themes.frictionPoints.length > 0) && (
+        <div className="ops-card p-3">
+          <div className="d-flex align-items-center justify-content-between mb-2">
+            <div className="d-flex align-items-center gap-2">
+              <Sparkles size={16} className="text-primary" />
+              <span className="fw-bold text-dark small">AI Review Topic & Sentiment Mining</span>
+            </div>
+            {activeTopic && (
+              <button
+                onClick={() => setActiveTopic(null)}
+                className="btn btn-xs btn-sm btn-link p-0 text-decoration-none small text-danger"
+              >
+                Clear Topic Filter (Active: "{activeTopic}")
+              </button>
+            )}
+          </div>
+
+          <div className="d-flex flex-wrap align-items-center gap-2">
+            <span className="text-muted small fw-semibold">Strengths:</span>
+            {themes.positiveThemes.map((th: any, idx: number) => (
+              <button
+                key={idx}
+                onClick={() => setActiveTopic(th.topic)}
+                className={`btn btn-xs btn-sm py-1 px-2 rounded-pill d-inline-flex align-items-center gap-1 ${
+                  activeTopic === th.topic ? 'btn-success text-white' : 'btn-outline-success bg-success bg-opacity-10 text-success'
+                }`}
+                style={{ fontSize: '0.75rem' }}
+                title={`Mentioned in reviews: "${th.sampleSnippet}"`}
+              >
+                <span>👍 {th.topic}</span>
+                <span className="badge bg-white text-success rounded-pill">{th.count}</span>
+              </button>
+            ))}
+
+            <span className="text-muted small fw-semibold ms-2">Friction Points:</span>
+            {themes.frictionPoints.map((fr: any, idx: number) => (
+              <button
+                key={idx}
+                onClick={() => setActiveTopic(fr.topic)}
+                className={`btn btn-xs btn-sm py-1 px-2 rounded-pill d-inline-flex align-items-center gap-1 ${
+                  activeTopic === fr.topic ? 'btn-danger text-white' : 'btn-outline-danger bg-danger bg-opacity-10 text-danger'
+                }`}
+                style={{ fontSize: '0.75rem' }}
+                title={`Customer friction: "${fr.sampleSnippet}"`}
+              >
+                <span>⚠️ {fr.topic}</span>
+                <span className="badge bg-white text-danger rounded-pill">{fr.count}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Main Review Inbox Layout */}
       <div className="row g-3">

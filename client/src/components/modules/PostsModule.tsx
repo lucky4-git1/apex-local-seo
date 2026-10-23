@@ -18,13 +18,14 @@ import {
 } from 'lucide-react';
 
 export const PostsModule: React.FC = () => {
-  const { currentLocation, showToast } = useApp();
+  const { currentLocation, locations, showToast } = useApp();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'all' | 'published' | 'scheduled' | 'drafts'>('all');
 
   // Creator form modal
   const [isCreating, setIsCreating] = useState(false);
+  const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
   const [postType, setPostType] = useState<'STANDARD' | 'EVENT' | 'OFFER'>('STANDARD');
   const [summary, setSummary] = useState('');
   const [ctaType, setCtaType] = useState<'LEARN_MORE' | 'ACTION_CALL' | 'BOOK' | 'SIGN_UP' | 'NONE'>('LEARN_MORE');
@@ -43,6 +44,7 @@ export const PostsModule: React.FC = () => {
   useEffect(() => {
     if (currentLocation) {
       loadPosts();
+      setSelectedLocationIds([currentLocation.id]);
     }
   }, [currentLocation?.id]);
 
@@ -81,26 +83,33 @@ export const PostsModule: React.FC = () => {
   };
 
   const handleCreatePost = async (publishImmediate = false) => {
-    if (!currentLocation || !summary.trim()) return;
+    if (!currentLocation || !summary.trim() || selectedLocationIds.length === 0) return;
     try {
-      const newPost = await api.createPost(currentLocation.id, {
-        postType,
-        summary,
-        ctaType,
-        ctaUrl: ctaUrl || currentLocation.websiteUrl,
-        mediaUrl: mediaUrl || undefined,
-        campaignLabel: campaignLabel || undefined,
-        couponCode: couponCode || undefined,
-        eventTitle: eventTitle || undefined,
-        status: publishImmediate ? 'PUBLISHED' : scheduledFor ? 'SCHEDULED' : 'DRAFT',
-        scheduledFor: scheduledFor || undefined
-      });
+      const targetLocs = locations.filter((l) => selectedLocationIds.includes(l.id));
+      for (const loc of targetLocs) {
+        const newPost = await api.createPost(loc.id, {
+          postType,
+          summary,
+          ctaType,
+          ctaUrl: ctaUrl || loc.websiteUrl,
+          mediaUrl: mediaUrl || undefined,
+          campaignLabel: campaignLabel || undefined,
+          couponCode: couponCode || undefined,
+          eventTitle: eventTitle || undefined,
+          status: publishImmediate ? 'PUBLISHED' : scheduledFor ? 'SCHEDULED' : 'DRAFT',
+          scheduledFor: scheduledFor || undefined
+        });
 
-      if (publishImmediate && newPost.status !== 'PUBLISHED') {
-        await api.publishPost(newPost.id);
+        if (publishImmediate && newPost.status !== 'PUBLISHED') {
+          await api.publishPost(newPost.id);
+        }
       }
 
-      showToast(publishImmediate ? 'Post published to Google Profile!' : 'Post saved successfully!');
+      showToast(
+        publishImmediate
+          ? `Post published to ${targetLocs.length} location${targetLocs.length > 1 ? 's' : ''}!`
+          : `Post scheduled/drafted for ${targetLocs.length} location${targetLocs.length > 1 ? 's' : ''}!`
+      );
       setIsCreating(false);
       resetForm();
       loadPosts();
@@ -380,6 +389,61 @@ export const PostsModule: React.FC = () => {
               </div>
 
               <div className="modal-body d-flex flex-column gap-3">
+                {/* Target Locations Selection */}
+                {locations.length > 1 && (
+                  <div className="p-3 bg-light rounded border">
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <label className="form-label small fw-bold mb-0">Publish to Locations ({selectedLocationIds.length} selected):</label>
+                      <button
+                        type="button"
+                        className="btn btn-link p-0 text-decoration-none small"
+                        style={{ fontSize: '0.78rem' }}
+                        onClick={() => {
+                          if (selectedLocationIds.length === locations.length) {
+                            setSelectedLocationIds([currentLocation.id]);
+                          } else {
+                            setSelectedLocationIds(locations.map((l) => l.id));
+                          }
+                        }}
+                      >
+                        {selectedLocationIds.length === locations.length ? 'Reset to Current Only' : 'Select All Locations'}
+                      </button>
+                    </div>
+                    <div className="d-flex flex-wrap gap-2">
+                      {locations.map((loc) => {
+                        const isChecked = selectedLocationIds.includes(loc.id);
+                        return (
+                          <label
+                            key={loc.id}
+                            className={`d-flex align-items-center gap-2 px-2.5 py-1.5 rounded border small cursor-pointer ${
+                              isChecked ? 'bg-primary-subtle border-primary text-primary fw-semibold' : 'bg-white text-secondary'
+                            }`}
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedLocationIds([...selectedLocationIds, loc.id]);
+                                } else {
+                                  if (selectedLocationIds.length > 1) {
+                                    setSelectedLocationIds(selectedLocationIds.filter((id) => id !== loc.id));
+                                  } else {
+                                    showToast('At least one target location must be selected', 'info');
+                                  }
+                                }
+                              }}
+                            />
+                            <span>{loc.title}</span>
+                            <span className="text-muted" style={{ fontSize: '0.72rem' }}>({loc.city})</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <div className="row g-3">
                   <div className="col-12 col-md-6">
                     <label className="form-label small fw-semibold">Post Type</label>

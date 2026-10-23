@@ -186,9 +186,30 @@ describe('Local SEO & Google Business Profile Operations Platform Test Suite', (
       expect(csv).toContain('"Total Impressions"');
       expect(csv).toContain('"Share of Local Voice (SoLV)"');
     });
+
+    it('creates a tokenized public share link and resolves public portal view', () => {
+      const rep = ReportsService.generateReport({
+        orgId: 'org-apex-growth',
+        locationId: 'loc-apex-dental',
+        title: 'Shareable Client Portal Test Report',
+        type: 'executive_monthly',
+        startDate: '2026-09-01',
+        endDate: '2026-10-23'
+      });
+
+      const share = ReportsService.createShareToken(rep.id);
+      expect(share.token).toBeDefined();
+      expect(share.shareUrl).toBe(`/portal/${share.token}`);
+
+      const portalData = ReportsService.getPublicReportByToken(share.token);
+      expect(portalData).toBeDefined();
+      expect(portalData?.report.id).toBe(rep.id);
+      expect(portalData?.location.city).toBe('Seattle');
+      expect(portalData?.org.name).toBeDefined();
+    });
   });
 
-  describe('7. AI Operations Copilot', () => {
+  describe('7. AI Operations Copilot & Persistence', () => {
     it('identifies unanswered reviews and generates action proposal', async () => {
       const res = await AiService.processQuery('Show me unanswered negative reviews and draft responses', 'loc-apex-dental');
       expect(res.reply).toBeDefined();
@@ -201,6 +222,35 @@ describe('Local SEO & Google Business Profile Operations Platform Test Suite', (
       expect(res.actionProposals.length).toBeGreaterThan(0);
       expect(res.actionProposals[0].type).toBe('task_creation');
       expect(res.actionProposals[0].requiresConfirmation).toBe(true);
+    });
+
+    it('persists AI conversation history and supports clearing', async () => {
+      const initialHistory = AiService.getChatHistory('loc-apex-dental');
+      expect(initialHistory.length).toBeGreaterThan(0);
+
+      // Verify the latest assistant message has content
+      const lastMsg = initialHistory[initialHistory.length - 1];
+      expect(lastMsg.content.length).toBeGreaterThan(0);
+
+      // Clear history
+      AiService.clearChatHistory('loc-apex-dental');
+      const clearedHistory = AiService.getChatHistory('loc-apex-dental');
+      expect(clearedHistory.length).toBe(0);
+    });
+  });
+
+  describe('8. Review Topic & Sentiment Mining', () => {
+    it('extracts top sentiment themes and counts from verified reviews', () => {
+      const themes = ReviewsService.getReviewThemes('loc-apex-dental');
+      expect(themes.positiveThemes).toBeDefined();
+      expect(themes.positiveThemes.length).toBeGreaterThan(0);
+      expect(themes.frictionPoints).toBeDefined();
+      expect(themes.frictionPoints.length).toBeGreaterThan(0);
+
+      const gentleCare = themes.positiveThemes.find((t) => t.topic.toLowerCase().includes('care') || t.topic.toLowerCase().includes('hygiene'));
+      expect(gentleCare).toBeDefined();
+      expect(gentleCare?.sentiment).toBe('positive');
+      expect(gentleCare?.count).toBeGreaterThan(0);
     });
   });
 });

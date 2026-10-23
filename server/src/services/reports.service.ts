@@ -1,9 +1,10 @@
 import { db } from '../db/index.js';
-import { Report } from '../types/index.js';
+import { Report, BusinessLocation, Organization } from '../types/index.js';
 import { ProfileService } from './profile.service.js';
 import { PerformanceService } from './performance.service.js';
 import { AuditService } from './audit.service.js';
 import { RankingService } from './ranking.service.js';
+import crypto from 'node:crypto';
 
 export class ReportsService {
   static getReports(locationId: string): Report[] {
@@ -128,6 +129,81 @@ export class ReportsService {
     ];
 
     return lines.join('\n');
+  }
+
+  static createShareToken(reportId: string): { token: string; shareUrl: string } {
+    const report = this.getReport(reportId);
+    if (!report) throw new Error('Report not found');
+
+    // Check existing active token
+    const existing = db.prepare(
+      'SELECT token FROM shared_client_reports WHERE report_id = ? AND is_active = 1'
+    ).get(reportId) as any;
+
+    if (existing) {
+      return {
+        token: existing.token,
+        shareUrl: `/portal/${existing.token}`
+      };
+    }
+
+    const token = crypto.randomBytes(16).toString('hex');
+    const id = `shr-${Date.now()}`;
+    const createdAt = new Date().toISOString();
+
+    db.prepare(`
+      INSERT INTO shared_client_reports (id, token, report_id, org_id, location_id, is_active, created_at)
+      VALUES (?, ?, ?, ?, ?, 1, ?)
+    `).run(id, token, reportId, report.orgId, report.locationId, createdAt);
+
+    return {
+      token,
+      shareUrl: `/portal/${token}`
+    };
+  }
+
+  static getPublicReportByToken(token: string): {
+    report: Report;
+    location: {
+      title: string;
+      city: string;
+      state: string;
+      phoneNumber: string;
+      websiteUrl: string;
+      primaryCategory: string;
+    };
+    org: {
+      name: string;
+      plan: string;
+    };
+  } | null {
+    const share = db.prepare(
+      'SELECT * FROM shared_client_reports WHERE token = ? AND is_active = 1'
+    ).get(token) as any;
+
+    if (!share) return null;
+
+    const report = this.getReport(share.report_id);
+    if (!report) return null;
+
+    const loc = ProfileService.getLocation(share.location_id);
+    const org = db.prepare('SELECT name, plan FROM organizations WHERE id = ?').get(share.org_id) as any;
+
+    return {
+      report,
+      location: {
+        title: loc?.title || '',
+        city: loc?.city || '',
+        state: loc?.state || '',
+        phoneNumber: loc?.phoneNumber || '',
+        websiteUrl: loc?.websiteUrl || '',
+        primaryCategory: loc?.primaryCategory || ''
+      },
+      org: {
+        name: org?.name || 'Local SEO Agency',
+        plan: org?.plan || 'ENTERPRISE'
+      }
+    };
   }
 
   private static mapReport(r: any): Report {

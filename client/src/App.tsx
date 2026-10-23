@@ -14,12 +14,17 @@ import { AnalyticsModule } from './components/modules/AnalyticsModule';
 import { TasksModule } from './components/modules/TasksModule';
 import { ReportsModule } from './components/modules/ReportsModule';
 import { IntegrationsModule } from './components/modules/IntegrationsModule';
+import { PublicPortalView } from './components/modules/PublicPortalView';
 
 export const App: React.FC = () => {
   return (
     <AppProvider>
       <BrowserRouter>
         <Routes>
+          {/* Public Tokenized Client Portal */}
+          <Route path="/portal/:token" element={<PublicPortalView />} />
+
+          {/* Authenticated Platform Operations Shell */}
           <Route path="/" element={<Shell />}>
             <Route index element={<OverviewModule />} />
             <Route path="profile" element={<ProfileModule />} />

@@ -256,3 +256,25 @@ CREATE TABLE IF NOT EXISTS activity_logs (
   details TEXT NOT NULL,
   timestamp TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS ai_conversations (
+  id TEXT PRIMARY KEY,
+  location_id TEXT NOT NULL,
+  role TEXT NOT NULL,
+  content TEXT NOT NULL,
+  proposals TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (location_id) REFERENCES business_locations(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS shared_client_reports (
+  id TEXT PRIMARY KEY,
+  token TEXT UNIQUE NOT NULL,
+  report_id TEXT NOT NULL,
+  org_id TEXT NOT NULL,
+  location_id TEXT NOT NULL,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (report_id) REFERENCES reports(id) ON DELETE CASCADE,
+  FOREIGN KEY (location_id) REFERENCES business_locations(id) ON DELETE CASCADE
+);

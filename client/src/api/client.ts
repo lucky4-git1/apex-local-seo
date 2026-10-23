@@ -105,6 +105,11 @@ export const api = {
     }),
 
   // Reviews
+  getReviewThemes: (locationId: string) =>
+    request<{
+      positiveThemes: Array<{ topic: string; count: number; sentiment: 'positive'; sampleSnippet: string }>;
+      frictionPoints: Array<{ topic: string; count: number; sentiment: 'negative'; severity: 'critical' | 'high' | 'medium'; sampleSnippet: string }>;
+    }>(`/locations/${locationId}/reviews/themes`),
   getReviews: (locationId: string, filters?: { rating?: number; sentiment?: string; responseStatus?: string; search?: string }) => {
     const q = new URLSearchParams();
     if (filters?.rating) q.set('rating', String(filters.rating));
@@ -235,8 +240,33 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data)
     }),
+  createReportShareLink: (reportId: string) =>
+    request<{ token: string; shareUrl: string }>(`/reports/${reportId}/share`, {
+      method: 'POST'
+    }),
+  getPublicReport: (token: string) =>
+    request<{
+      report: Report;
+      location: {
+        title: string;
+        city: string;
+        state: string;
+        phoneNumber: string;
+        websiteUrl: string;
+        primaryCategory: string;
+      };
+      org: {
+        name: string;
+        plan: string;
+      };
+    }>(`/portal/${token}`),
+  getReportCsvUrl: (reportId: string) => `/api/v1/reports/${reportId}/export/csv`,
 
   // AI Assistant
+  getAiHistory: (locationId: string) =>
+    request<Array<{ role: 'user' | 'assistant'; content: string; proposals?: any[]; createdAt: string }>>(`/locations/${locationId}/ai/history`),
+  clearAiHistory: (locationId: string) =>
+    request<{ success: boolean }>(`/locations/${locationId}/ai/history`, { method: 'DELETE' }),
   queryAi: (query: string, locationId: string, history?: any[]) =>
     request<{
       reply: string;

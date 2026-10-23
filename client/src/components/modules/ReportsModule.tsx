@@ -20,6 +20,8 @@ export const ReportsModule: React.FC = () => {
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [sharedUrl, setSharedUrl] = useState<string | null>(null);
   const [isClientPortalMode, setIsClientPortalMode] = useState(false);
 
   useEffect(() => {
@@ -58,6 +60,24 @@ export const ReportsModule: React.FC = () => {
       showToast(`Generation failed: ${err.message}`, 'error');
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleShareReport = async () => {
+    if (!selectedReport) return;
+    setSharing(true);
+    try {
+      const res = await api.createReportShareLink(selectedReport.id);
+      const fullUrl = `${window.location.origin}${res.shareUrl}`;
+      setSharedUrl(fullUrl);
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(fullUrl);
+      }
+      showToast('Client Portal link copied to clipboard!');
+    } catch (err: any) {
+      showToast(`Failed to generate share link: ${err.message}`, 'error');
+    } finally {
+      setSharing(false);
     }
   };
 
@@ -128,6 +148,15 @@ export const ReportsModule: React.FC = () => {
             </div>
 
             <div className="d-flex align-items-center gap-2 d-print-none">
+              <button
+                onClick={handleShareReport}
+                disabled={sharing}
+                className="btn btn-sm btn-outline-primary d-flex align-items-center gap-1"
+                title="Generate tokenized link for client presentation"
+              >
+                <Share2 size={14} />
+                <span>{sharing ? 'Generating Link...' : 'Share Client Link'}</span>
+              </button>
               <button onClick={handleExportCsv} className="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1">
                 <Download size={14} />
                 <span>Export CSV</span>
@@ -138,6 +167,18 @@ export const ReportsModule: React.FC = () => {
               </button>
             </div>
           </div>
+
+          {sharedUrl && (
+            <div className="alert alert-success d-flex align-items-center justify-content-between p-2.5 mb-4 small d-print-none">
+              <div className="d-flex align-items-center gap-2">
+                <CheckCircle2 size={16} className="text-success flex-shrink-0" />
+                <span>Public Client Share Link: <code className="user-select-all bg-white px-2 py-0.5 rounded border">{sharedUrl}</code></span>
+              </div>
+              <a href={sharedUrl} target="_blank" rel="noreferrer" className="btn btn-sm btn-success py-1 px-3 fw-semibold">
+                Open Client Portal
+              </a>
+            </div>
+          )}
 
           {/* Executive Summary */}
           <div className="mb-4">

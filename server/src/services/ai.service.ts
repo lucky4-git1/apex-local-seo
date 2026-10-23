@@ -30,6 +30,49 @@ export class AiService {
     const loc = ProfileService.getLocation(locationId);
     if (!loc) throw new Error('Location context not found');
 
+    // Save user message to DB
+    db.prepare(`
+      INSERT INTO ai_conversations (id, location_id, role, content, proposals, created_at)
+      VALUES (?, ?, 'user', ?, '[]', ?)
+    `).run(`ai-usr-${Date.now()}`, locationId, query, new Date().toISOString());
+
+    const finalResult = await this.generateResponse(qLower, loc, locationId);
+
+    // Save assistant reply to DB
+    db.prepare(`
+      INSERT INTO ai_conversations (id, location_id, role, content, proposals, created_at)
+      VALUES (?, ?, 'assistant', ?, ?, ?)
+    `).run(
+      `ai-${Date.now() + 1}`,
+      locationId,
+      finalResult.reply,
+      JSON.stringify(finalResult.actionProposals),
+      new Date().toISOString()
+    );
+
+    return finalResult;
+  }
+
+  static getChatHistory(locationId: string): Array<{ role: 'user' | 'assistant'; content: string; proposals?: AiActionProposal[]; createdAt: string }> {
+    const rows = db.prepare('SELECT * FROM ai_conversations WHERE location_id = ? ORDER BY created_at ASC').all(locationId) as any[];
+    return rows.map(r => ({
+      role: r.role as 'user' | 'assistant',
+      content: r.content,
+      proposals: JSON.parse(r.proposals || '[]'),
+      createdAt: r.created_at
+    }));
+  }
+
+  static clearChatHistory(locationId: string): boolean {
+    const res = db.prepare('DELETE FROM ai_conversations WHERE location_id = ?').run(locationId);
+    return res.changes > 0;
+  }
+
+  private static async generateResponse(qLower: string, loc: any, locationId: string): Promise<{
+    reply: string;
+    actionProposals: AiActionProposal[];
+    dataContext?: any;
+  }> {
     const actionProposals: AiActionProposal[] = [];
 
     // 0. Friendly greeting handler

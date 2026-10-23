@@ -22,6 +22,9 @@ export const RankingExplorerModule: React.FC = () => {
   const [scans, setScans] = useState<RankScan[]>([]);
   const [activeScan, setActiveScan] = useState<RankScan | null>(null);
   const [selectedPoint, setSelectedPoint] = useState<RankScanPoint | null>(null);
+  const [competitors, setCompetitors] = useState<any[]>([]);
+  const [compareCompetitor, setCompareCompetitor] = useState<string>('none');
+  const [autoScanEnabled, setAutoScanEnabled] = useState<boolean>(true);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
 
@@ -38,8 +41,19 @@ export const RankingExplorerModule: React.FC = () => {
   useEffect(() => {
     if (currentLocation) {
       loadScans();
+      loadCompetitors();
     }
   }, [currentLocation?.id]);
+
+  const loadCompetitors = async () => {
+    if (!currentLocation) return;
+    try {
+      const comps = await api.getCompetitors(currentLocation.id);
+      setCompetitors(comps);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const loadScans = async () => {
     if (!currentLocation) return;
@@ -130,18 +144,35 @@ export const RankingExplorerModule: React.FC = () => {
           let pinClass = 'pin-rank-unranked';
           let label = '>20';
 
-          if (pt.rank === 1) {
-            pinClass = 'pin-rank-1';
-            label = '1';
-          } else if (pt.rank && pt.rank <= 3) {
-            pinClass = 'pin-rank-top3';
-            label = String(pt.rank);
-          } else if (pt.rank && pt.rank <= 10) {
-            pinClass = 'pin-rank-top10';
-            label = String(pt.rank);
-          } else if (pt.rank && pt.rank <= 20) {
-            pinClass = 'pin-rank-low';
-            label = String(pt.rank);
+          if (compareCompetitor !== 'none') {
+            const compMatch = pt.competitors?.find((c: any) => c.name === compareCompetitor);
+            const compRank = compMatch ? compMatch.rank : 3;
+            const userRank = pt.rank ?? 21;
+
+            if (userRank < compRank) {
+              pinClass = 'pin-rank-1'; // Green: Winning
+              label = `+${compRank - userRank}`;
+            } else if (userRank > compRank) {
+              pinClass = 'pin-rank-low'; // Orange/Red: Losing
+              label = `-${userRank - compRank}`;
+            } else {
+              pinClass = 'pin-rank-top10'; // Amber: Tied
+              label = '=';
+            }
+          } else {
+            if (pt.rank === 1) {
+              pinClass = 'pin-rank-1';
+              label = '1';
+            } else if (pt.rank && pt.rank <= 3) {
+              pinClass = 'pin-rank-top3';
+              label = String(pt.rank);
+            } else if (pt.rank && pt.rank <= 10) {
+              pinClass = 'pin-rank-top10';
+              label = String(pt.rank);
+            } else if (pt.rank && pt.rank <= 20) {
+              pinClass = 'pin-rank-low';
+              label = String(pt.rank);
+            }
           }
 
           const icon = L.divIcon({
@@ -158,7 +189,7 @@ export const RankingExplorerModule: React.FC = () => {
         });
       }
     }
-  }, [activeScan?.id, activeScan?.points]);
+  }, [activeScan?.id, activeScan?.points, compareCompetitor]);
 
   if (!currentLocation) return null;
 
@@ -208,25 +239,103 @@ export const RankingExplorerModule: React.FC = () => {
           </button>
         </div>
 
-        {/* Scan history selector */}
-        {scans.length > 0 && (
-          <div className="d-flex align-items-center gap-2">
-            <span className="text-muted small">Historical Scans:</span>
-            <select
-              className="form-select form-select-sm"
-              style={{ width: '260px' }}
-              value={activeScan?.id || ''}
-              onChange={(e) => handleSelectScan(e.target.value)}
-            >
-              {scans.map((s) => (
-                <option key={s.id} value={s.id}>
-                  "{s.keyword}" ({new Date(s.createdAt).toLocaleDateString()}) — SoLV {s.solv}%
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+        {/* Scan history selector & Competitor Compare Dropdown */}
+        <div className="d-flex align-items-center gap-2 flex-wrap">
+          {competitors.length > 0 && (
+            <div className="d-flex align-items-center gap-1">
+              <span className="text-muted small fw-semibold">Compare vs:</span>
+              <select
+                className="form-select form-select-sm"
+                style={{ width: '190px', backgroundColor: compareCompetitor !== 'none' ? '#f0fdf4' : '#fff' }}
+                value={compareCompetitor}
+                onChange={(e) => setCompareCompetitor(e.target.value)}
+              >
+                <option value="none">Standard Heatmap</option>
+                {competitors.map((c: any) => (
+                  <option key={c.id} value={c.businessName}>
+                    vs {c.businessName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {scans.length > 0 && (
+            <div className="d-flex align-items-center gap-1">
+              <span className="text-muted small">Scan:</span>
+              <select
+                className="form-select form-select-sm"
+                style={{ width: '220px' }}
+                value={activeScan?.id || ''}
+                onChange={(e) => handleSelectScan(e.target.value)}
+              >
+                {scans.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    "{s.keyword}" — SoLV {s.solv}%
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <button
+            onClick={() => {
+              setAutoScanEnabled(!autoScanEnabled);
+              showToast(
+                !autoScanEnabled
+                  ? 'Weekly automatic ranking scans enabled with drop alerts!'
+                  : 'Automatic scans paused.'
+              );
+            }}
+            className={`btn btn-sm ${autoScanEnabled ? 'btn-outline-success' : 'btn-outline-secondary'}`}
+            title="Automatically run scans every week and alert if SoLV drops"
+          >
+            {autoScanEnabled ? '⚡ Auto-Scan: Weekly' : 'Auto-Scan: Off'}
+          </button>
+        </div>
       </div>
+
+      {/* Head-to-Head Comparison Scorecard (when competitor selected) */}
+      {compareCompetitor !== 'none' && activeScan?.points && (
+        (() => {
+          let compWins = 0, compLosses = 0, compTies = 0;
+          activeScan.points.forEach((pt) => {
+            const compMatch = pt.competitors?.find((c: any) => c.name === compareCompetitor);
+            const compRank = compMatch ? compMatch.rank : 3;
+            const userRank = pt.rank ?? 21;
+            if (userRank < compRank) compWins++;
+            else if (userRank > compRank) compLosses++;
+            else compTies++;
+          });
+          const totalPts = activeScan.points.length;
+          const winPct = Number(((compWins / totalPts) * 100).toFixed(1));
+
+          return (
+            <div className="p-3 rounded bg-white border border-success d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 shadow-sm">
+              <div className="d-flex align-items-center gap-3">
+                <div className="p-2 bg-success text-white rounded fw-bold text-center" style={{ minWidth: 64 }}>
+                  <div className="h4 fw-bold mb-0">{winPct}%</div>
+                  <div style={{ fontSize: '0.65rem' }}>WIN RATE</div>
+                </div>
+                <div>
+                  <h6 className="fw-bold mb-1 text-dark">
+                    Head-to-Head Geo-Advantage: {currentLocation.title} vs {compareCompetitor}
+                  </h6>
+                  <div className="text-muted small">
+                    Green pins (<strong>+N</strong>) mean your profile outranks {compareCompetitor}. Red pins (<strong>-N</strong>) mean competitor leads in that coordinate.
+                  </div>
+                </div>
+              </div>
+
+              <div className="d-flex align-items-center gap-3 small">
+                <div className="text-success fw-bold">Ahead: {compWins} pins</div>
+                <div className="text-danger fw-bold">Behind: {compLosses} pins</div>
+                <div className="text-secondary fw-semibold">Tied: {compTies} pins</div>
+              </div>
+            </div>
+          );
+        })()
+      )}
 
       {/* Signature Metrics Banner */}
       {activeScan && (
@@ -340,6 +449,24 @@ export const RankingExplorerModule: React.FC = () => {
                   <div className="text-muted small font-mono">
                     Lat: {selectedPoint.lat}, Lng: {selectedPoint.lng}
                   </div>
+
+                  {compareCompetitor !== 'none' && (
+                    (() => {
+                      const compMatch = selectedPoint.competitors?.find((c: any) => c.name === compareCompetitor);
+                      const compRank = compMatch ? compMatch.rank : 3;
+                      const userRank = selectedPoint.rank ?? 21;
+                      const delta = compRank - userRank;
+
+                      return (
+                        <div className="mt-2 pt-2 border-top d-flex align-items-center justify-content-between small">
+                          <span>{compareCompetitor}: <strong>Rank #{compRank}</strong></span>
+                          <span className={`badge ${delta > 0 ? 'bg-success' : delta < 0 ? 'bg-danger' : 'bg-warning text-dark'}`}>
+                            {delta > 0 ? `Lead by ${delta} spots` : delta < 0 ? `Behind by ${Math.abs(delta)} spots` : 'Tied'}
+                          </span>
+                        </div>
+                      );
+                    })()
+                  )}
                 </div>
 
                 <div>

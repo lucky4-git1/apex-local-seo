@@ -198,6 +198,11 @@ apiRouter.post('/locations/:id/rank-scans', (req: Request, res: Response) => {
 // ==========================================
 // 6. REVIEWS & REPUTATION INBOX
 // ==========================================
+apiRouter.get('/locations/:id/reviews/themes', (req: Request, res: Response) => {
+  const themes = ReviewsService.getReviewThemes(req.params.id);
+  res.json({ success: true, data: themes });
+});
+
 apiRouter.get('/locations/:id/reviews', (req: Request, res: Response) => {
   const reviews = ReviewsService.getReviews({
     locationId: req.params.id,
@@ -442,9 +447,40 @@ apiRouter.get('/reports/:id/export/csv', (req: Request, res: Response) => {
   }
 });
 
+apiRouter.post('/reports/:id/share', (req: Request, res: Response) => {
+  try {
+    const result = ReportsService.createShareToken(req.params.id);
+    res.json({ success: true, data: result });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+apiRouter.get('/portal/:token', (req: Request, res: Response) => {
+  try {
+    const data = ReportsService.getPublicReportByToken(req.params.token);
+    if (!data) {
+      return res.status(404).json({ success: false, error: 'Share link not found or expired' });
+    }
+    res.json({ success: true, data });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ==========================================
 // 13. AI COPILOT
 // ==========================================
+apiRouter.get('/locations/:id/ai/history', (req: Request, res: Response) => {
+  const history = AiService.getChatHistory(req.params.id);
+  res.json({ success: true, data: history });
+});
+
+apiRouter.delete('/locations/:id/ai/history', (req: Request, res: Response) => {
+  const deleted = AiService.clearChatHistory(req.params.id);
+  res.json({ success: deleted });
+});
+
 apiRouter.post('/ai/query', async (req: Request, res: Response) => {
   try {
     const { query, locationId, history } = req.body;

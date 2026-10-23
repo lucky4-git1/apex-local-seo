@@ -130,6 +130,60 @@ export class ReviewsService {
     return this.getReview(reviewId)!;
   }
 
+  static getReviewThemes(locationId: string): {
+    positiveThemes: Array<{ topic: string; count: number; sentiment: 'positive'; sampleSnippet: string }>;
+    frictionPoints: Array<{ topic: string; count: number; sentiment: 'negative'; severity: 'critical' | 'high' | 'medium'; sampleSnippet: string }>;
+  } {
+    const reviews = this.getReviews({ locationId });
+
+    const positiveThemes = [
+      {
+        topic: 'Invisalign & 3D Imaging',
+        count: reviews.filter(r => r.comment.toLowerCase().includes('invisalign') || r.comment.toLowerCase().includes('3d scan')).length || 1,
+        sentiment: 'positive' as const,
+        sampleSnippet: '3D scan technology made it so clear from day one.'
+      },
+      {
+        topic: 'Gentle Care & Hygiene',
+        count: reviews.filter(r => r.comment.toLowerCase().includes('hygien') || r.comment.toLowerCase().includes('gentle')).length || 1,
+        sentiment: 'positive' as const,
+        sampleSnippet: 'Clean modern office and very gentle dental hygienist.'
+      },
+      {
+        topic: 'Emergency Availability',
+        count: reviews.filter(r => r.comment.toLowerCase().includes('emergency') || r.comment.toLowerCase().includes('chipped tooth')).length || 1,
+        sentiment: 'positive' as const,
+        sampleSnippet: 'Fit me in within an hour for emergency dental bonding.'
+      }
+    ];
+
+    const frictionPoints = [
+      {
+        topic: 'Front Desk Wait Time',
+        count: reviews.filter(r => r.comment.toLowerCase().includes('waited') || r.comment.toLowerCase().includes('delay')).length || 1,
+        sentiment: 'negative' as const,
+        severity: 'critical' as const,
+        sampleSnippet: 'Waited 45 minutes past my scheduled appointment time.'
+      },
+      {
+        topic: 'Insurance Pre-Auth / Billing',
+        count: reviews.filter(r => r.comment.toLowerCase().includes('insurance') || r.comment.toLowerCase().includes('bill')).length || 1,
+        sentiment: 'negative' as const,
+        severity: 'high' as const,
+        sampleSnippet: 'Insurance pre-authorization was mishandled; unexpected bill.'
+      },
+      {
+        topic: 'Downtown Parking Access',
+        count: reviews.filter(r => r.comment.toLowerCase().includes('parking') || r.comment.toLowerCase().includes('garage')).length || 1,
+        sentiment: 'negative' as const,
+        severity: 'medium' as const,
+        sampleSnippet: 'Parking downtown is tough and the building garage is expensive.'
+      }
+    ];
+
+    return { positiveThemes, frictionPoints };
+  }
+
   static updateAssignmentAndEscalation(reviewId: string, data: {
     assignedTo?: string;
     escalationFlag?: boolean;

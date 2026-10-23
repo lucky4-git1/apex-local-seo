@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../api/client';
-import { Sparkles, X, Send, CheckCircle2, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Sparkles, X, Send, CheckCircle2, ArrowRight, ShieldCheck, AlertCircle, Trash2 } from 'lucide-react';
 
 interface Proposal {
   type: string;
@@ -17,18 +17,54 @@ interface Message {
   proposals?: Proposal[];
 }
 
+const defaultWelcomeMessage: Message = {
+  role: 'assistant',
+  content: `Hello! I am your **Local SEO & Google Business Profile Operations Copilot**. I analyze your live profile data, audit findings, customer reviews, and map visibility. Ask me what needs fixing or select a quick workflow below:`
+};
+
 export const AiCopilotDrawer: React.FC = () => {
   const { isAiDrawerOpen, setIsAiDrawerOpen, currentLocation, showToast, refreshLocation } = useApp();
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'assistant',
-      content: `Hello! I am your **Local SEO & Google Business Profile Operations Copilot**. I analyze your live profile data, audit findings, customer reviews, and map visibility. Ask me what needs fixing or select a quick workflow below:`
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([defaultWelcomeMessage]);
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [executingProposal, setExecutingProposal] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Load persistent history on location change or drawer open
+  useEffect(() => {
+    if (currentLocation && isAiDrawerOpen) {
+      loadHistory();
+    }
+  }, [currentLocation?.id, isAiDrawerOpen]);
+
+  const loadHistory = async () => {
+    if (!currentLocation) return;
+    try {
+      const history = await api.getAiHistory(currentLocation.id);
+      if (history.length > 0) {
+        setMessages(history.map(h => ({
+          role: h.role,
+          content: h.content,
+          proposals: h.proposals
+        })));
+      } else {
+        setMessages([defaultWelcomeMessage]);
+      }
+    } catch (err) {
+      console.error('Failed to load chat history:', err);
+    }
+  };
+
+  const handleClearHistory = async () => {
+    if (!currentLocation) return;
+    try {
+      await api.clearAiHistory(currentLocation.id);
+      setMessages([defaultWelcomeMessage]);
+      showToast('Chat history cleared.');
+    } catch (err: any) {
+      showToast(`Clear failed: ${err.message}`, 'error');
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -112,12 +148,21 @@ export const AiCopilotDrawer: React.FC = () => {
               </div>
             </div>
           </div>
-          <button
-            onClick={() => setIsAiDrawerOpen(false)}
-            className="btn btn-sm btn-light border-0 p-1 text-secondary"
-          >
-            <X size={18} />
-          </button>
+          <div className="d-flex align-items-center gap-1">
+            <button
+              onClick={handleClearHistory}
+              className="btn btn-sm btn-outline-secondary border-0 p-1 text-muted"
+              title="Clear Conversation History"
+            >
+              <Trash2 size={16} />
+            </button>
+            <button
+              onClick={() => setIsAiDrawerOpen(false)}
+              className="btn btn-sm btn-light border-0 p-1 text-secondary"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Message feed - strictly vertical column */}
