@@ -32,6 +32,10 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 });
 
 // API Routes
+app.get('/api/health', (_req: Request, res: Response) => {
+  res.json({ status: 'ok', service: 'Local SEO API', timestamp: new Date().toISOString() });
+});
+
 app.use('/api/v1', apiRouter);
 
 // Serve Client in Production
